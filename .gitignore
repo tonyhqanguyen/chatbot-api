@@ -109,4 +109,4 @@ typings/
 .dynamodb/
 
 # essentials
-./helpers/access_token.js
+helpers/access_token.js
