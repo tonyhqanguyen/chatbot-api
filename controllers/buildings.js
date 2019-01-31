@@ -32,17 +32,26 @@ module.exports = {
         });
     },
 
-    optimize: (req, res) => {
-        let time = undefined;
-        console.log(req.query);
-        if (req.query.time != undefined) {
-            time = moment(req.query.time, "YYYY-MM-DD::HH");
-        } else {
-            time = moment();
-        }
+    optimize: (code, res, replies) => {
+        // let time = undefined;
+        // console.log(req.query);
+        // if (req.query.time != undefined) {
+        //     time = moment(req.query.time, "YYYY-MM-DD::HH");
+        // } else {
+        //     time = moment();
+        // }
 
-        ace.orderRooms(req.query.code, time).then((v) => {
-            res.json(v);
+        ace.orderRooms(code, moment()).then((v) => {
+            replies.push(`Here are rooms in ${code}!`);
+            if (v.length === 0) {
+                res.status(200).send(["Sorry, I could not find anything from what you told me. I will try to learn and understand more!"])
+            } else {
+                for (let i = 0; i < v.length; i++) {
+                    const item = v[i];
+                    replies.push(`Room ${item.id} from ${item.freeFrom} to ${item.freeUntil}.`);
+                }
+                res.status(200).send(replies);
+            }
         }).catch((error) => {
             res.json("error");
             console.log(error);

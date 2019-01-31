@@ -1,39 +1,62 @@
-const request = require('request');
+const axios = require('axios');
 const key = "gaNSkQ47YVfpvjZaKTwXKnwXZewp5i7k";
 
-module.exports = (req, res) => {
-    let body = req.body;
-    console.log("body", body);
-    let keywords = body.keywords;
-    console.log("keywords: ", keywords);
+module.exports = async (keywords, res, replies) => {
+    console.log("Searching for food!")
+    // let body = req.body;
+    // console.log("body", body);
+    // let keywords = body.keywords;
+    // console.log("keywords: ", keywords);
+    console.log("keywords", keywords);
     try {
         let ids = [];
         let restaurants = [];
-        keywords.forEach(element => {
-            request({
-                url: `https://cobalt.qas.im/api/1.0/food/search?q=\"${element}\"&key=${key}`,
-                method: 'GET'
-                }, (error, response, body) => {
-                    let temp = JSON.parse(body);
-                    console.log("body", temp);
-                    console.log("body length", temp.length);
-                    console.log("first item", temp[0]);
-                    if (error === null) {
-                        for (let i = 0; i < temp.length; i++) {
-                            console.log("id", temp[i].id);
-                            if (!ids.includes(temp[i].id)) {
-                                console.log("add");
-                                restaurants.push(temp[i]);
-                                ids.push(temp[i].id);
-                            }
-                        }
-                    };
-                    res.send(restaurants);
-                });
-            ;
-        });
+        for (let t = 0; t < keywords.length; t++) {
+            let temp = await axios.get(`https://cobalt.qas.im/api/1.0/food/search?q=\"${keywords[t]}\"&key=${key}`);
+            temp = temp.data;
+            for (let i = 0; i < temp.length; i++) {
+                if (!ids.includes(temp[i].id)) {
+                    restaurants.push(temp[i]);
+                    ids.push(temp[i].id);
+                }
+            }
+        }
+        
+        newKeywords = [];
+        if (restaurants.length === 0) {
+            for (let k = 0; k < keywords.length; k++) {
+                let splitWords = keywords[k].split(" ");
+                if (splitWords.length > 1) {
+                    newKeywords.push(...splitWords);
+                }
+            }
+            keywords = newKeywords;
+            for (let t = 0; t < keywords.length; t++) {
+                let temp = await axios.get(`https://cobalt.qas.im/api/1.0/food/search?q=\"${keywords[t]}\"&key=${key}`);
+                temp = temp.data;
+                for (let i = 0; i < temp.length; i++) {
+                    if (!ids.includes(temp[i].id)) {
+                        restaurants.push(temp[i]);
+                        ids.push(temp[i].id);
+                    }
+                }
+            }
+        }
+
+        if (restaurants.length === 0) {
+            res.status(200).send(["Sorry, I could not find anything from what you told me. I will try to learn and understand more!"])
+        } else {
+            replies.push("Here are some food places that might be relevant to what you are looking for!");
+            for (let i = 0; i < restaurants.length; i++) {
+                const item = restaurants[i];
+                replies.push(`${item.name}: ${item.description}
+                Location: ${item.address}`);
+            }
+            res.status(200).send(replies);
+        }
     } catch (error) {
-        res.status(400).end();
+        console.log(error);
+        return false;
     }
 }
 

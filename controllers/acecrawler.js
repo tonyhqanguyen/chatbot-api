@@ -2,29 +2,41 @@
 
 const Promise = require('promise');
 const cheerio = require('cheerio');
+const moment = require('moment');
+require('moment-round');
 const request = require('request-promise');
-const buildings = require('../essentials/buildinginfo.js');
 
+if (!String.prototype.format) {
+    String.prototype.format = function () {
+      var args = arguments;
+      return this.replace(/{(\d+)}/g, function (match, number) {
+        return typeof args[number] != 'undefined'
+          ? args[number]
+          : match
+          ;
+      });
+    };
+  }
 
 module.exports = {
     getBuildingCodes: () => {
         const requestOptions = {
             method: 'GET',
-            uri: "http://www.ace.utoronto.ca/ws/f?p=200:3:1742256958421901::::P3_BLDG,P3_ROOM:,",
+            uri: "https://www.ace.utoronto.ca/webapp/f?p=200:1:::::",
             json: false,
-            jar: true
+            jar: request.jar()
         };
 
-        let promise = new Promise((resolve, reject) => {
-            request(requestOptions).then((response) => {
-                let $ = cheerio.load(response);
-                let buildingCodes = [];
-
-                $('#P3_BLDG').children().each((i, element) => {
-                    let code = element.children[0].data.slice(0, 2);
-                    let name = buildings.getBuilding(code);
-                    buildingCodes[i] = {id: code, name: buildings.getBuilding(code).name};
-                });
+        let promise = new Promise(function (resolve, reject) {
+            request(requestOptions).then(function (response) {
+              let $ = cheerio.load(response);
+              let buildingCodes = [];
+      
+              $("#P1_BLDG").children().each(function (i, elem) {
+                let code = $(this).attr('value');
+                let name = $(this).text().split(" ").slice(1).join(" ").trim();
+                buildingCodes[i] = { id: code, name: name };
+              });
 
                 resolve(buildingCodes.slice(1));
             }).catch((error) => {
@@ -38,29 +50,21 @@ module.exports = {
     getRooms: (buildingCode) => {
         const requestOptions = {
             method: 'GET',
-            uri: "http://www.ace.utoronto.ca/ws/f?p=200:3:1742256958421901::::P3_BLDG,P3_ROOM:" + buildingCode + ",",
+            uri: "https://www.ace.utoronto.ca/webapp/f?p=200:1:::::P1_BLDG:{0}"
+            .format(buildingCode),
             json: false,
-            jar: true
+            jar: request.jar()
         };
 
-        console.log("http://www.ace.utoronto.ca/ws/f?p=200:3:1742256958421901::::P3_BLDG,P3_ROOM:" + buildingCode + ",")
-
-        let promise = new Promise((resolve, reject) => {
-            console.log("inside promise")
-            request(requestOptions).then((response) => {
-                console.log("trying to load response");
-
-                let $ = cheerio.load(response);
-                let rooms = [];
-
-                console.log("loaded response");
-                $("#P3_ROOM").children().each((i, element) => {
-                    console.log("ElEMENT " + i);
-                    console.log(element.attribs.value);
-                    console.log(element.children[0].data);
-                    console.log("==================================");
-                    rooms[i] = {id: element.attribs.value, name: element.children[0].data};
-                });
+        let promise = new Promise(function (resolve, reject) {
+            request(requestOptions).then(function (response) {
+              let $ = cheerio.load(response);
+              let rooms = [];
+      
+              $("#P1_ROOM").children().each(function (i, elem) {
+                rooms[i] = {id: $(this).attr('value'), name: $(this).text().trim()};
+              });
+                console.log(rooms);
 
                 resolve(rooms.slice(1));
             }).catch((error) => {
@@ -73,48 +77,66 @@ module.exports = {
     },
 
     getWeekSchedule: (buildingCode, roomNumber, dayOfWeek) => {
-        let startDate = dayOfWeek.clone().startOf('isoWeek');
-
-        const requestOptions = {
-            method: 'GET',
-            uri: `http://www.ace.utoronto.ca/ws/f?p=200:5:::::P5_BLDG,P5_ROOM,P5_CALENDAR_DATE:${buildingCode},${roomNumber},${startDate.format("YYYYMMDD")},`, 
-            json: false,
-            jar: true
+        let startDate = dayOfWeek.clone().startOf('isoWeek'); //use the same day for every day in the week, for caching purposes
+        let myJar = request.jar() //cookie jar for this request
+    
+        const options = {
+          method: 'GET',
+          uri: `https://www.ace.utoronto.ca/webapp/f?p=200:1:::::P1_BLDG,P1_ROOM,P1_CALENDAR_DATE:${buildingCode},${roomNumber},${startDate.format("YYYYMMDD")}`,
+          json: false,
+          jar: myJar
         };
-
-        let schedule = [];
-
+    
+        let sched = [];
+    
         let promise = new Promise((resolve, reject) => {
-            request(requestOptions).then((response) => {
-                let $ = cheerio.load(response);
-
-                let currentDateTime = startDate.hours(7);
-
-                $("table.t3SmallWeekCalendar>tbody>tr").each((i, element) => {
-                    if (i > 1) {
-                        $("td", this).each((i, element) => {
-                            let name = $(this).text().trim();
-                            if (name != "") {
-                                schedule.push({
-                                    buildingCode: buildingCode,
-                                    roomNumber: roomNumber,
-                                    time: currentDateTime.clone(),
-                                    name: name,
-                                });
-                            }
-                            currentDateTime.add(1, "day");
-                        });
-                        currentDateTime.add(1, "hour");
-                        currentDateTime.subtract(7, "days");
-                    }
-                });
-
-                resolve(schedule);
-            }).catch((error) => {
-                reject(error);
+          request(options).then((body) => {
+    
+            //needed to call calendar API
+            let ajaxIdentifier = body.match("apex.widget.cssCalendar(.*)}\\)")[1].match("ajaxIdentifier\":\"(.*)\"}")[1];
+    
+            const calendarApiOptions = {
+              method: 'POST',
+              uri: 'https://www.ace.utoronto.ca/webapp/wwv_flow.ajax',
+              jar: myJar,
+              form: {
+                p_flow_id: 200,
+                p_flow_step_id: 1,
+                p_instance: 0,
+                p_request: "PLUGIN={0}".format(ajaxIdentifier),
+                x01: "GET",
+                x02: startDate.format("YYYYMMDD"),
+                x03: startDate.add(7, 'days').format("YYYYMMDD")
+              }
+            };
+    
+            request(calendarApiOptions).then((body) => {
+              let responseSched = JSON.parse(body);
+    
+              for (let i = 0; i < responseSched.length; i++) {
+                let currentTimeSpot = responseSched[i];
+                let currentTime = moment(currentTimeSpot.start);
+                let endTime = moment(currentTimeSpot.end).minute(0);
+    
+                while (!currentTime.isSame(endTime, 'hour')) {
+                  sched.push({
+                    buildingCode: buildingCode,
+                    roomNumber: roomNumber,
+                    time: currentTime.clone(),
+                    name: currentTimeSpot.title
+                  });
+                  currentTime.add(1, 'hour');
+                }
+              }
+    
+              resolve(sched);
+    
+            }).catch( (err) => {
+              reject(err);
             });
+          });
+    
         });
-
         return promise;
-    }
+      }
 }
