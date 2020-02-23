@@ -3,10 +3,6 @@ const key = "gaNSkQ47YVfpvjZaKTwXKnwXZewp5i7k";
 
 module.exports = async (keywords, res, replies) => {
     console.log("Searching for food!")
-    // let body = req.body;
-    // console.log("body", body);
-    // let keywords = body.keywords;
-    // console.log("keywords: ", keywords);
     console.log("keywords", keywords);
     try {
         let ids = [];
