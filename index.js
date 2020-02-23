@@ -18,11 +18,11 @@ const replier = require('./controllers/reply.js');
 const entity_extractor = require('./controllers/getentity.js');
 
 const app = express();
-const router = express.Router();
 
-app.set('port', 4000);
+app.set("port", (process.env.PORT) || 4000);
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+app.use(express.static(__dirname + '/public'));
 
 app.listen(app.get('port'), () => console.log("Webhook server is listening, port " + app.get('port')));
 
