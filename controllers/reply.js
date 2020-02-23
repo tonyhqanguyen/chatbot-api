@@ -1,4 +1,3 @@
-let {PythonShell} = require('python-shell');
 const food = require('./food.js');
 const parking = require('./parking.js');
 const courses = require('./courses.js');

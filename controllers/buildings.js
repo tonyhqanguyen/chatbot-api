@@ -1,9 +1,6 @@
 "use strict"
 
-const Promise = require('promise');
-const express = require('express');
 const moment = require('moment');
-require('moment-round');
 const ace = require('./aceapi.js');
 
 module.exports = {

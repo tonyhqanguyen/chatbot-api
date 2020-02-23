@@ -3,7 +3,6 @@
 const Promise = require('promise');
 const cheerio = require('cheerio');
 const moment = require('moment');
-require('moment-round');
 const request = require('request-promise');
 
 if (!String.prototype.format) {

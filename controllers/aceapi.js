@@ -2,7 +2,6 @@
 
 const Promise = require('promise');
 const moment = require('moment');
-require('moment-round');
 const aceScraper = require('./acecrawler.js');
 const NodeCache = require("node-cache");
 const aceCache = new NodeCache({ stdTTL: 18000, checkperiod: 3600 });
